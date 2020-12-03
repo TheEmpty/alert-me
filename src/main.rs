@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::process::Command;
 use std::time::Duration;
 use std::sync::Arc;
-use std::collections::HashMap; // Not threadsafe
+use dashmap::DashMap;
 
 /// How often to poll the reddit
 const WAIT_INTERVAL_DURATION: Duration = Duration::from_secs(60 * 5);
@@ -42,7 +42,7 @@ fn get_trigger_executable_path() -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let last_update_hash: Arc<HashMap<String, f64>> = Arc::new(HashMap::new());
+    let last_update_hash: Arc<DashMap<String, f64>> = Arc::new(DashMap::new());
 
     println!(
         "Will call {} when a new comment is added.",
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Error> {
 }
 
 /// Triggers for new comments from the given reddit user
-async fn check_reddit_user_comments(username: String, mut last_update_hash: Arc<HashMap<String, f64>>) {
+async fn check_reddit_user_comments(username: String, last_update_hash: Arc<DashMap<String, f64>>) {
     let request_url = format!(
         "https://www.reddit.com/user/{user}/comments.json",
         user = username, 
@@ -71,13 +71,13 @@ async fn check_reddit_user_comments(username: String, mut last_update_hash: Arc<
     let last_update_key = format!("reddit_{user}", user = username);
 
     if last_update_hash.get(&last_update_key).is_none() {
-        Arc::get_mut(&mut last_update_hash).unwrap().insert(last_update_key.clone(), response.data.children.get(0).unwrap().data.created_utc);
+       last_update_hash.insert(last_update_key.clone(), response.data.children.get(0).unwrap().data.created_utc);
     }
 
     for comment in comments.rev() {
         let last_update = last_update_hash.get(&last_update_key).unwrap();
         if comment.data.created_utc > *last_update {
-            Arc::get_mut(&mut last_update_hash).unwrap().insert(last_update_key.clone(), comment.data.created_utc);
+            last_update_hash.insert(last_update_key.clone(), comment.data.created_utc);
             let message = format!(
                 "{user}: {comment}",
                 user = comment.data.author,
