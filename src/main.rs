@@ -55,6 +55,7 @@ async fn main() -> Result<(), Error> {
         info!("Refreshing");
         // TODO: config
         check_reddit_user_comments("Fast-Wolverine".to_string(), last_update_hash.clone()).await;
+
         check_amazon_stock(
             "PS5".to_string(),
             "com".to_string(),
@@ -62,8 +63,63 @@ async fn main() -> Result<(), Error> {
             last_update_hash.clone(),
         )
         .await;
+
+        check_target_stock(
+            "PS5".to_string(),
+            "A-81114595".to_string(),
+            last_update_hash.clone(),
+        ).await;
+
         tokio::time::delay_for(WAIT_INTERVAL_DURATION.clone()).await;
     }
+}
+
+async fn check_target_stock(
+    name: String,
+    id: String,
+    last_update_hash: Arc<DashMap<String, f64>>,
+) -> Result<(), ErrorCode> {
+    let request_url = format!(
+        "https://www.target.com/p/{}",
+        id
+    );
+    let response = reqwest::get(&request_url).await?.text().await?;
+
+    let stock = match response.contains("Out of stock in stores near you") {
+        true => 0.0,
+        false => 1.0,
+    };
+
+    let last_update_key = format!("target_{}", id);
+    if last_update_hash.get(&last_update_key).is_none() {
+        last_update_hash.insert(last_update_key.clone(), stock);
+    } else {
+        let last_value = match last_update_hash.get(&last_update_key) {
+            Some(val) => val,
+            None => return Err(ErrorCode::GeneralError),
+        };
+
+        if *last_value != stock {
+            last_update_hash.insert(last_update_key.clone(), stock);
+            info!(
+                "Target stock for {name} changed to {stock}",
+                name = name,
+                stock = stock
+            );
+            if stock == 1.0 {
+                let product = format!(
+                    "{name} back in stock on Target",
+                    name = name,
+                );
+                debug!("Triggering for {:?}", product);
+                let _ = Command::new(get_trigger_executable_path())
+                    .arg(product)
+                    .spawn();
+            }
+        }
+    }
+
+    Ok(())
 }
 
 async fn check_amazon_stock(
