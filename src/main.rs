@@ -80,12 +80,12 @@ async fn check_target_stock(
     last_update_hash: Arc<DashMap<String, f64>>,
 ) -> Result<(), ErrorCode> {
     let request_url = format!(
-        "https://www.target.com/p/{}",
+        "https://redsky.target.com/v3/pdp/tcin/77464002?excludes=taxonomy&key={}",
         id
     );
     let response = reqwest::get(&request_url).await?.text().await?;
 
-    let stock = match response.contains("Out of stock in stores near you") {
+    let stock = match response.contains("\"is_out_of_stock_in_all_online_locations\":true") {
         true => 0.0,
         false => 1.0,
     };
@@ -93,6 +93,7 @@ async fn check_target_stock(
     let last_update_key = format!("target_{}", id);
     if last_update_hash.get(&last_update_key).is_none() {
         last_update_hash.insert(last_update_key.clone(), stock);
+        info!("Setting init state for {} to {}", last_update_key, stock);
     } else {
         let last_value = match last_update_hash.get(&last_update_key) {
             Some(val) => val,
@@ -143,6 +144,7 @@ async fn check_amazon_stock(
     let last_update_key = format!("amazon_{asin}", asin = asin);
     if last_update_hash.get(&last_update_key).is_none() {
         last_update_hash.insert(last_update_key.clone(), stock);
+        info!("Setting init state for {} to {}", last_update_key, stock);
     } else {
         let last_value = match last_update_hash.get(&last_update_key) {
             Some(val) => val,
