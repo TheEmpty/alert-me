@@ -54,9 +54,9 @@ async fn main() -> Result<(), Error> {
     loop {
         info!("Refreshing");
         // TODO: config
-        check_reddit_user_comments("Fast-Wolverine".to_string(), last_update_hash.clone()).await;
+        let _ = check_reddit_user_comments("Fast-Wolverine".to_string(), last_update_hash.clone()).await;
 
-        check_amazon_stock(
+        let _ = check_amazon_stock(
             "PS5".to_string(),
             "com".to_string(),
             "B08FC5L3RG".to_string(),
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Error> {
         )
         .await;
 
-        check_target_stock(
+        let _ = check_target_stock(
             "PS5".to_string(),
             "A-81114595".to_string(),
             last_update_hash.clone(),
